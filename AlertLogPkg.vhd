@@ -66,8 +66,8 @@ use ieee.numeric_std.all ;
 package AlertLogPkg is
 
   subtype  AlertLogIDType   is integer ;
-  type     AlertType        is (FAILURE, ERROR, WARNING) ;  -- NEVER
-  subtype  AlertIndexType   is AlertType range FAILURE to WARNING ;
+  type     AlertType        is (FAILURE, ERROR, WARNING, PASSING) ;  -- NEVER
+  subtype  AlertIndexType   is AlertType range FAILURE to PASSING;  --WARNING ;
   type     AlertCountType   is array (AlertIndexType) of integer ;
   type     AlertEnableType  is array(AlertIndexType) of boolean ;
   type     LogType          is (ALWAYS, DEBUG, FINAL, INFO, PASSED) ;  -- NEVER  -- See function IsLogEnableType
@@ -107,6 +107,7 @@ package AlertLogPkg is
   ------------------------------------------------------------
   -- Similar to assert, except condition is positive
   procedure AlertIf( AlertLogID : AlertLogIDType ; condition : boolean ; Message : string ; Level : AlertType := ERROR )  ; 
+  procedure AlertIf( name : string; condition : boolean ; Message : string ; Level : AlertType := ERROR )  ; 
   procedure AlertIf( condition : boolean ; Message : string ; Level : AlertType := ERROR ) ; 
   impure function  AlertIf( AlertLogID : AlertLogIDType ; condition : boolean ; Message : string ; Level : AlertType := ERROR ) return boolean ; 
   impure function  AlertIf( condition : boolean ; Message : string ; Level : AlertType := ERROR ) return boolean ; 
@@ -177,6 +178,13 @@ package AlertLogPkg is
     LogLevel     : LogType := PASSED ;
     AlertLevel   : AlertType := ERROR
   ) ;
+  procedure AffirmIf (
+    name         : string;
+    condition    : boolean ;
+    Message      : string ;
+    LogLevel     : LogType := PASSED ;
+    AlertLevel   : AlertType := ERROR
+  );
   procedure AffirmIf(condition : boolean ; Message : string ;  LogLevel : LogType := PASSED ; AlertLevel : AlertType := ERROR) ;
 
   ------------------------------------------------------------
@@ -312,12 +320,14 @@ package body AlertLogPkg is
 
   -- instead of justify(to_upper(to_string())), just look up the upper case, left justified values
   type     AlertNameType is array(AlertType) of string(1 to 7) ; 
-  constant ALERT_NAME : AlertNameType := (WARNING => "WARNING", ERROR => "ERROR  ", FAILURE => "FAILURE") ;  -- , NEVER => "NEVER  "
+  constant ALERT_NAME : AlertNameType := (WARNING => "WARNING", ERROR => "ERROR  ", FAILURE => "FAILURE", PASSING => "PASSING") ;  -- , NEVER => "NEVER  "
   type     LogNameType is array(LogType) of string(1 to 7) ; 
   constant LOG_NAME : LogNameType := (DEBUG => "DEBUG  ", FINAL => "FINAL  ", INFO => "INFO   ", ALWAYS => "ALWAYS ", PASSED => "PASSED ") ; -- , NEVER => "NEVER  "
 
 
   type AlertLogStructPType is protected
+
+    procedure IncAffirmPassCount(AlertLogID : AlertLogIDType);
   
     ------------------------------------------------------------
     procedure alert ( 
@@ -331,7 +341,7 @@ package body AlertLogPkg is
     procedure IncAlertCount ( AlertLogID : AlertLogIDType ; level : AlertType := ERROR ) ;
     procedure SetJustify ;
     procedure ReportAlerts ( Name : string ; AlertCount : AlertCountType ) ;
-    procedure ReportAlerts ( Name : string := OSVVM_STRING_INIT_PARM_DETECT ; AlertLogID : AlertLogIDType := ALERTLOG_BASE_ID ; ExternalErrors : AlertCountType := (0,0,0) ; ReportAll : boolean := TRUE ) ;
+    procedure ReportAlerts ( Name : string := OSVVM_STRING_INIT_PARM_DETECT ; AlertLogID : AlertLogIDType := ALERTLOG_BASE_ID ; ExternalErrors : AlertCountType := (0,0,0,0) ; ReportAll : boolean := TRUE ) ;
     procedure ClearAlerts ; 
     impure function GetAlertCount(AlertLogID : AlertLogIDType := ALERTLOG_BASE_ID) return AlertCountType ;
     impure function GetEnabledAlertCount(AlertLogID : AlertLogIDType := ALERTLOG_BASE_ID) return AlertCountType ;
@@ -589,7 +599,7 @@ package body AlertLogPkg is
     begin
       if GlobalAlertEnabledVar then
         IncrementAlertCount(AlertLogID, Level, StopDueToCount) ;
-        if StopDueToCount then 
+        if StopDueToCount and Level /= PASSING then 
           write(buf, LF & AlertPrefix & " Stop Count on " & ALERT_NAME(Level) & " reached") ; 
 --xx          if NumAlertLogIDsVar > NumPredefinedAlIDsVar then -- print hierarchy names even when silent
            if FoundAlertHierVar then 
@@ -646,6 +656,9 @@ package body AlertLogPkg is
       if FailOnWarningVar and AlertEnabled(WARNING) then 
         Count(WARNING) := AlertCount(WARNING) ; 
       end if ;
+      if AlertEnabled(PASSING) then 
+        Count(PASSING) := AlertCount(PASSING) ; 
+      end if;
       return Count ; 
     end function GetEnabledAlertCount ; 
 
@@ -664,6 +677,15 @@ package body AlertLogPkg is
     begin
       return GetEnabledAlertCount(AlertLogPtr(AlertLogID).AlertCount, AlertLogPtr(AlertLogID).AlertEnabled) ;
     end function GetEnabledAlertCount ; 
+
+
+
+    procedure IncAffirmPassCount(AlertLogID : AlertLogIDType) is
+    begin
+      AlertLogPtr(AlertLogID).AlertCount(PASSING) := AlertLogPtr(AlertLogID).AlertCount(PASSING) + 1 ;
+    end procedure IncAffirmPassCount;
+
+
     
     ------------------------------------------------------------
     -- PT Local
@@ -680,6 +702,9 @@ package body AlertLogPkg is
       if FailOnWarningVar and not AlertEnabled(WARNING) then 
         Count(WARNING) := AlertCount(WARNING) ; 
       end if ;
+      if not AlertEnabled(PASSING) then 
+        Count(PASSING) := AlertCount(PASSING) ; 
+      end if ; 
       return Count ; 
     end function GetDisabledAlertCount ; 
 
@@ -742,21 +767,29 @@ package body AlertLogPkg is
           write(buf, "  at "  & to_string(NOW, 1 ns)) ;
           WriteLine(buf) ; 
         end if ; 
-      else 
+      else
         -- Failed 
-        write(buf, ReportPrefix & DoneName & "  " & FailName & "  "& Name) ; 
-        write(buf, "  Total Error(s) = "      & to_string(NumErrors) ) ;
-        write(buf, "  Failures: "  & to_string(AlertCount(FAILURE)) ) ;
-        write(buf, "  Errors: "    & to_string(AlertCount(ERROR) ) ) ;
-        write(buf, "  Warnings: "  & to_string(AlertCount(WARNING) ) ) ;
+        write(buf, ReportPrefix & DoneName & "  " & FailName & "  " & Name) ; 
         if AffirmCheckCountVar > 0 then 
+          write(buf, "  Affirmations Checked: " & to_string(AffirmCheckCountVar)) ; 
+        end if ;
+        write(buf, "  at "  & to_string(NOW, 1 ns)) ;
+        WriteLine(buf) ; 
+      end if;
+      write(buf, LF & ReportPrefix);
+      write(buf, "Total Error(s) = "      & to_string(NumErrors) ) ;
+      write(buf, "  Failures: "  & to_string(AlertCount(FAILURE)) ) ;
+      write(buf, "  Errors: "    & to_string(AlertCount(ERROR) ) ) ;
+      write(buf, "  Warnings: "  & to_string(AlertCount(WARNING) ) ) ;
+      write(buf, "  Passings: "  & to_string(AlertCount(PASSING) ) ) ;
+--      if AffirmCheckCountVar > 0 then 
 --??         write(buf, "  Affirmations Passed: " & to_string(AffirmPassedCountVar)) ;
 --??          write(buf, "  Checked: " & to_string(AffirmCheckCountVar)) ; 
-          write(buf, "  Affirmations Checked: " & to_string(AffirmCheckCountVar)) ; 
-        end if ; 
-        Write(buf, "  at "  & to_string(NOW, 1 ns)) ;
-        WriteLine(buf) ; 
-      end if ; 
+--        write(buf, "  Affirmations Checked: " & to_string(AffirmCheckCountVar)) ; 
+--      end if ; 
+      Write(buf, "  at "  & to_string(NOW, 1 ns)) ;
+      WriteLine(buf) ; 
+--      end if ; 
     end procedure PrintTopAlerts ; 
 
     ------------------------------------------------------------
@@ -777,7 +810,8 @@ package body AlertLogPkg is
             write(buf, "  Failures: "  & to_string(AlertLogPtr(i).AlertCount(FAILURE) ) ) ;
             write(buf, "  Errors: "    & to_string(AlertLogPtr(i).AlertCount(ERROR) ) ) ;
             write(buf, "  Warnings: "  & to_string(AlertLogPtr(i).AlertCount(WARNING) ) ) ;
-            WriteLine(buf) ; 
+            write(buf, "  Passings: "  & to_string(AlertLogPtr(i).AlertCount(PASSING) ) ) ;
+            WriteLine(buf) ;
           end if ; 
           PrintChild(
             AlertLogID    => i, 
@@ -821,13 +855,12 @@ package body AlertLogPkg is
         ) ;
       end if ; 
       --Print Hierarchy when enabled and error or disabled error
-      if (FoundReportHierVar and ReportHierarchyVar) and (NumErrors /= 0 or NumDisabledErrors /=0) then
+      if (FoundReportHierVar and ReportHierarchyVar) then --and (NumErrors /= 0) or NumDisabledErrors /=0) then
         PrintChild(
           AlertLogID    => AlertLogID, 
           Prefix        => ReportPrefix & "  ", 
           IndentAmount  => 2,
           ReportAll     => ReportAll
-        ) ; 
       end if ; 
     end procedure ReportAlerts ; 
     
@@ -850,12 +883,12 @@ package body AlertLogPkg is
       AffirmCheckCountVar  := 0 ; 
 --??      AffirmPassedCountVar := 0 ; 
 
-      AlertLogPtr(ALERTLOG_BASE_ID).AlertCount := (0, 0, 0) ;
-      AlertLogPtr(ALERTLOG_BASE_ID).AlertStopCount := (FAILURE => 0, ERROR => integer'right, WARNING => integer'right) ; 
+      AlertLogPtr(ALERTLOG_BASE_ID).AlertCount := (0, 0, 0, 0) ;
+      AlertLogPtr(ALERTLOG_BASE_ID).AlertStopCount := (FAILURE => 0, ERROR => integer'right, WARNING => integer'right, PASSING => integer'right) ; 
 
       for i in ALERTLOG_BASE_ID + 1 to NumAlertLogIDsVar loop 
-        AlertLogPtr(i).AlertCount := (0, 0, 0) ; 
-        AlertLogPtr(i).AlertStopCount := (FAILURE => integer'right, ERROR => integer'right, WARNING => integer'right) ; 
+        AlertLogPtr(i).AlertCount := (0, 0, 0, 0) ; 
+        AlertLogPtr(i).AlertStopCount := (FAILURE => integer'right, ERROR => integer'right, WARNING => integer'right, PASSING => integer'right) ; 
       end loop ; 
     end procedure ClearAlerts ; 
 
@@ -930,9 +963,9 @@ package body AlertLogPkg is
       variable LogEnabled     : LogEnableType ; 
     begin
       if AlertLogID = ALERTLOG_BASE_ID then 
-        AlertEnabled := (TRUE, TRUE, TRUE) ; 
+        AlertEnabled := (TRUE, TRUE, TRUE, TRUE) ; 
         LogEnabled   := (others => FALSE) ;
-        AlertStopCount := (FAILURE => 0, ERROR => integer'right, WARNING => integer'right) ; 
+        AlertStopCount := (FAILURE => 0, ERROR => integer'right, WARNING => integer'right, PASSING => integer'right) ; 
       else
         if ParentID < ALERTLOG_BASE_ID then
           AlertEnabled := AlertLogPtr(ALERTLOG_BASE_ID).AlertEnabled ; 
@@ -941,12 +974,12 @@ package body AlertLogPkg is
           AlertEnabled := AlertLogPtr(ParentID).AlertEnabled ; 
           LogEnabled   := AlertLogPtr(ParentID).LogEnabled ;
         end if ; 
-        AlertStopCount := (FAILURE => integer'right, ERROR => integer'right, WARNING => integer'right) ; 
+        AlertStopCount := (FAILURE => integer'right, ERROR => integer'right, WARNING => integer'right, PASSING => integer'right) ; 
       end if ; 
       AlertLogPtr(AlertLogID) := new AlertLogRecType ; 
       AlertLogPtr(AlertLogID).Name              := new string'(NAME) ;
       AlertLogPtr(AlertLogID).ParentID          := ParentID ;  
-      AlertLogPtr(AlertLogID).AlertCount        := (0, 0, 0) ;
+      AlertLogPtr(AlertLogID).AlertCount        := (0, 0, 0, 0) ;
       AlertLogPtr(AlertLogID).AlertEnabled      := AlertEnabled ; 
       AlertLogPtr(AlertLogID).AlertStopCount    := AlertStopCount ;
       AlertLogPtr(AlertLogID).LogEnabled        := LogEnabled ;
@@ -1605,7 +1638,17 @@ package body AlertLogPkg is
   begin
     if condition then
       AlertLogStruct.Alert(AlertLogID , Message, Level) ; 
+    else
+      AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
     end if ; 
+  end procedure AlertIf ; 
+
+  ------------------------------------------------------------
+  procedure AlertIf( name  : string ; condition : boolean ; Message : string ; Level : AlertType := ERROR ) is
+  ------------------------------------------------------------
+    constant C_ID : AlertLogIDType := GetAlertLogID(name, ALERTLOG_BASE_ID, true);
+  begin
+    AlertIf(C_ID, condition, Message, Level);
   end procedure AlertIf ; 
 
   ------------------------------------------------------------
@@ -1632,6 +1675,8 @@ package body AlertLogPkg is
   begin
     if condition then
       AlertLogStruct.Alert(AlertLogID , Message, Level) ; 
+    else
+      AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
     end if ; 
     return condition ; 
   end function AlertIf ;  
@@ -1659,7 +1704,9 @@ package body AlertLogPkg is
   ------------------------------------------------------------
   begin
     if not condition then
-      AlertLogStruct.Alert(AlertLogID, Message, Level) ; 
+      AlertLogStruct.Alert(AlertLogID, Message, Level) ;
+    else
+      AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
     end if ; 
   end procedure AlertIfNot ; 
 
@@ -1687,6 +1734,8 @@ package body AlertLogPkg is
   begin
     if not condition then
       AlertLogStruct.Alert(AlertLogID, Message, Level) ; 
+    else
+      AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
     end if ; 
     return not condition ; 
   end function AlertIfNot ;  
@@ -1715,7 +1764,9 @@ package body AlertLogPkg is
   ------------------------------------------------------------
   begin
     if L ?= R then
-      AlertLogStruct.Alert(AlertLogID, Message & " L = R,  L = " & to_string(L) & "   R = " & to_string(R), Level) ; 
+      AlertLogStruct.Alert(AlertLogID, Message & " L = R,  L = " & to_string(L) & "   R = " & to_string(R), Level) ;
+    else
+      AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
     end if ; 
   end procedure AlertIfEqual ; 
   
@@ -1724,7 +1775,9 @@ package body AlertLogPkg is
   ------------------------------------------------------------
   begin
     if L ?= R then
-      AlertLogStruct.Alert(AlertLogID, Message & " L = R,  L = " & to_string(L) & "   R = " & to_string(R), Level) ; 
+      AlertLogStruct.Alert(AlertLogID, Message & " L = R,  L = " & to_string(L) & "   R = " & to_string(R), Level) ;
+    else
+      AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
     end if ; 
   end procedure AlertIfEqual ; 
   
@@ -1734,6 +1787,8 @@ package body AlertLogPkg is
   begin
     if L ?= R then
       AlertLogStruct.Alert(AlertLogID, Message & " L = R,  L = " & to_string(L) & "   R = " & to_string(R), Level) ; 
+    else
+      AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
     end if ; 
   end procedure AlertIfEqual ; 
   
@@ -1743,6 +1798,8 @@ package body AlertLogPkg is
   begin
     if L ?= R then
       AlertLogStruct.Alert(AlertLogID, Message & " L = R,  L = " & to_string(L) & "   R = " & to_string(R), Level) ; 
+    else
+      AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
     end if ; 
   end procedure AlertIfEqual ; 
   
@@ -1752,6 +1809,8 @@ package body AlertLogPkg is
   begin
     if L = R then
       AlertLogStruct.Alert(AlertLogID, Message & " L = R,  L = " & to_string(L) & "   R = " & to_string(R), Level) ; 
+    else
+      AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
     end if ; 
   end procedure AlertIfEqual ; 
   
@@ -1761,6 +1820,8 @@ package body AlertLogPkg is
   begin
     if L = R then
       AlertLogStruct.Alert(AlertLogID, Message & " L = R,  L = " & to_string(L, 4) & "   R = " & to_string(R, 4), Level) ; 
+    else
+      AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
     end if ; 
   end procedure AlertIfEqual ; 
   
@@ -1770,6 +1831,8 @@ package body AlertLogPkg is
   begin
     if L = R then
       AlertLogStruct.Alert(AlertLogID, Message & " L = R,  L = " & L & "   R = " & R, Level) ; 
+    else
+      AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
     end if ; 
   end procedure AlertIfEqual ; 
   
@@ -1779,6 +1842,8 @@ package body AlertLogPkg is
   begin
     if L = R then
       AlertLogStruct.Alert(AlertLogID, Message & " L = R,  L = " & L & "   R = " & R, Level) ; 
+    else
+      AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
     end if ; 
   end procedure AlertIfEqual ; 
 
@@ -1862,6 +1927,8 @@ package body AlertLogPkg is
   begin
     if L ?/= R then
       AlertLogStruct.Alert(AlertLogID, Message & " L /= R,  L = " & to_string(L) & "   R = " & to_string(R), Level) ; 
+    else
+      AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
     end if ; 
   end procedure AlertIfNotEqual ; 
   
@@ -1871,6 +1938,8 @@ package body AlertLogPkg is
   begin
     if L ?/= R then
       AlertLogStruct.Alert(AlertLogID, Message & " L /= R,  L = " & to_string(L) & "   R = " & to_string(R), Level) ; 
+    else
+      AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
     end if ; 
   end procedure AlertIfNotEqual ; 
   
@@ -1880,6 +1949,8 @@ package body AlertLogPkg is
   begin
     if L ?/= R then
       AlertLogStruct.Alert(AlertLogID, Message & " L /= R,  L = " & to_string(L) & "   R = " & to_string(R), Level) ; 
+    else
+      AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
     end if ; 
   end procedure AlertIfNotEqual ; 
   
@@ -1889,6 +1960,8 @@ package body AlertLogPkg is
   begin
     if L ?/= R then
       AlertLogStruct.Alert(AlertLogID, Message & " L /= R,  L = " & to_string(L) & "   R = " & to_string(R), Level) ; 
+    else
+      AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
     end if ; 
   end procedure AlertIfNotEqual ; 
   
@@ -1898,6 +1971,8 @@ package body AlertLogPkg is
   begin
     if L /= R then
       AlertLogStruct.Alert(AlertLogID, Message & " L /= R,  L = " & to_string(L) & "   R = " & to_string(R), Level) ; 
+    else
+      AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
     end if ; 
   end procedure AlertIfNotEqual ; 
   
@@ -1907,6 +1982,8 @@ package body AlertLogPkg is
   begin
     if L /= R then
       AlertLogStruct.Alert(AlertLogID, Message & " L /= R,  L = " & to_string(L, 4) & "   R = " & to_string(R, 4), Level) ; 
+    else
+      AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
     end if ; 
   end procedure AlertIfNotEqual ; 
   
@@ -1916,6 +1993,8 @@ package body AlertLogPkg is
   begin
     if L /= R then
       AlertLogStruct.Alert(AlertLogID, Message & " L /= R,  L = " & L & "   R = " & R, Level) ; 
+    else
+      AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
     end if ; 
   end procedure AlertIfNotEqual ; 
   
@@ -1925,6 +2004,8 @@ package body AlertLogPkg is
   begin
     if L /= R then
       AlertLogStruct.Alert(AlertLogID, Message & " L /= R,  L = " & L & "   R = " & R, Level) ; 
+    else
+      AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
     end if ; 
   end procedure AlertIfNotEqual ; 
 
@@ -2083,10 +2164,25 @@ package body AlertLogPkg is
       -- passed
       AlertLogStruct.Log(AlertLogID, Message, LogLevel) ; -- call log
 --      AlertLogStruct.IncAffirmPassCount ; -- increment pass & check count
+      AlertLogStruct.IncAffirmPassCount(AlertLogID);
     else
       AlertLogStruct.Alert(AlertLogID, Message, AlertLevel) ; -- signal failure
     end if ;
   end procedure AffirmIf ;
+
+  ------------------------------------------------------------
+  procedure AffirmIf (
+  ------------------------------------------------------------
+    name         : string;
+    condition    : boolean ;
+    Message      : string ;
+    LogLevel     : LogType := PASSED ;
+    AlertLevel   : AlertType := ERROR
+  ) is
+    constant C_ID : AlertLogIDType := GetAlertLogID(name, ALERTLOG_BASE_ID, true);
+  begin
+    AffirmIf(C_ID, condition, Message, LogLevel, AlertLevel);
+  end procedure AffirmIf;
 
   ------------------------------------------------------------
   procedure AffirmIf(condition : boolean ; Message : string ;  LogLevel : LogType := PASSED ; AlertLevel : AlertType := ERROR) is
@@ -2138,6 +2234,7 @@ package body AlertLogPkg is
     Result(FAILURE) := ABS( L(FAILURE) ) ; 
     Result(ERROR)   := ABS( L(ERROR) ) ; 
     Result(WARNING) := ABS( L(WARNING) ); 
+    Result(PASSING) := ABS( L(PASSING) ); 
     return Result ; 
   end function "ABS" ;
 
@@ -2149,6 +2246,7 @@ package body AlertLogPkg is
     Result(FAILURE) := L(FAILURE) + R(FAILURE) ; 
     Result(ERROR)   := L(ERROR)   + R(ERROR) ; 
     Result(WARNING) := L(WARNING) + R(WARNING) ; 
+    Result(PASSING) := L(PASSING) + R(PASSING) ; 
     return Result ; 
   end function "+" ;
 
@@ -2160,6 +2258,7 @@ package body AlertLogPkg is
     Result(FAILURE) := L(FAILURE) - R(FAILURE) ; 
     Result(ERROR)   := L(ERROR)   - R(ERROR) ; 
     Result(WARNING) := L(WARNING) - R(WARNING) ; 
+    Result(PASSING) := L(PASSING) - R(PASSING) ; 
     return Result ; 
   end function "-" ;
 
@@ -2171,6 +2270,7 @@ package body AlertLogPkg is
     Result(FAILURE) := - R(FAILURE) ; 
     Result(ERROR)   := - R(ERROR) ; 
     Result(WARNING) := - R(WARNING) ; 
+    Result(PASSING) := - R(PASSING) ; 
     return Result ; 
   end function "-" ;
   
@@ -2179,7 +2279,7 @@ package body AlertLogPkg is
   ------------------------------------------------------------
   begin
     -- Using ABS ensures correct expected error handling.  
-    return abs(AlertCount(FAILURE)) + abs(AlertCount(ERROR)) + abs(AlertCount(WARNING)) ; 
+    return abs(AlertCount(FAILURE)) + abs(AlertCount(ERROR)) + abs(AlertCount(WARNING)); -- + abs(AlertCount(PASSING))); 
   end function SumAlertCount ; 
 
   ------------------------------------------------------------
