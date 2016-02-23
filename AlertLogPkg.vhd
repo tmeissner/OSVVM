@@ -823,8 +823,73 @@ package body AlertLogPkg is
       end loop ; 
     end procedure PrintChild ; 
 
+
     ------------------------------------------------------------
-    procedure ReportAlerts ( Name : string := OSVVM_STRING_INIT_PARM_DETECT ; AlertLogID : AlertLogIDType := ALERTLOG_BASE_ID ; ExternalErrors : AlertCountType := (0,0,0) ; ReportAll : boolean := TRUE) is
+    -- PT Local
+    procedure PrintChildXml(AlertLogID : AlertLogIDType; ReportAll : boolean) is
+    ------------------------------------------------------------
+      variable buf : line;
+    begin
+      for i in AlertLogID+1 to NumAlertLogIDsVar loop
+        if AlertLogID = AlertLogPtr(i).ParentID then
+          if ReportAll or SumAlertCount(AlertLogPtr(i).AlertCount) > 0 then
+            write(buf, "  <" & "alert" & '>');
+            WriteLineXml(buf);
+            write(buf, "    <" & "alertname" & '>');
+            write(buf, AlertLogPtr(i).Name.all);
+            write(buf, '<' & "/alertname" & '>');
+            WriteLineXml(buf);
+            write(buf, "    <" & "failcount" & '>');
+            write(buf, to_string(AlertLogPtr(i).AlertCount(FAILURE)));
+            write(buf, '<' & "/failcount" & '>');
+            WriteLineXml(buf);
+            write(buf, "    <" & "errcount" & '>');
+            write(buf, to_string(AlertLogPtr(i).AlertCount(ERROR)));
+            write(buf, '<' & "/errcount" & '>');
+            WriteLineXml(buf);
+            write(buf, "    <" & "warncount" & '>');
+            write(buf, to_string(AlertLogPtr(i).AlertCount(WARNING)));
+            write(buf, '<' & "/warncount" & '>');
+            WriteLineXml(buf);
+            write(buf, "    <" & "passcount" & '>');
+            write(buf, to_string(AlertLogPtr(i).AlertCount(PASSING)));
+            write(buf, '<' & "/passcount" & '>');
+            WriteLineXml(buf);
+            write(buf, "  <" & "/alert" & '>');
+            WriteLineXml(buf);
+          end if;
+          PrintChildXml(AlertLogID => i, ReportAll  => ReportAll);
+        end if;
+      end loop;
+    end procedure PrintChildXml;
+
+
+    ------------------------------------------------------------
+    -- PT Local
+    procedure PrintXmlHeader is
+    ------------------------------------------------------------
+      variable buf : line;
+    begin
+      write(buf, '<' & "?xml version='1.0'?" & '>');
+      WriteLineXml(buf);
+      write(buf, '<' & "osvvm_coverage_report" & '>');
+      WriteLineXml(buf);
+    end procedure PrintXmlHeader;
+
+
+    ------------------------------------------------------------
+    -- PT Local
+    procedure PrintXmlFooter is
+    ------------------------------------------------------------
+      variable buf : line;
+    begin
+      write(buf, '<' & "/osvvm_coverage_report" & '>');
+      WriteLineXml(buf);
+    end procedure PrintXmlFooter;
+
+
+    ------------------------------------------------------------
+    procedure ReportAlerts ( Name : string := OSVVM_STRING_INIT_PARM_DETECT ; AlertLogID : AlertLogIDType := ALERTLOG_BASE_ID ; ExternalErrors : AlertCountType := (0,0,0,0) ; ReportAll : boolean := TRUE) is
     ------------------------------------------------------------
       variable NumErrors : integer ; 
       variable NumDisabledErrors : integer ; 
@@ -861,6 +926,10 @@ package body AlertLogPkg is
           Prefix        => ReportPrefix & "  ", 
           IndentAmount  => 2,
           ReportAll     => ReportAll
+        );
+        PrintXmlHeader;
+        PrintChildXml(AlertLogID => AlertLogID, ReportAll  => ReportAll);
+        PrintXmlFooter;
       end if ; 
     end procedure ReportAlerts ; 
     
