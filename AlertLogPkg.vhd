@@ -826,7 +826,7 @@ package body AlertLogPkg is
 
     ------------------------------------------------------------
     -- PT Local
-    procedure PrintChildXml(AlertLogID : AlertLogIDType; ReportAll : boolean) is
+    procedure PrintChildXml(file f : text ; AlertLogID : AlertLogIDType; ReportAll : boolean) is
     ------------------------------------------------------------
       variable buf : line;
     begin
@@ -834,31 +834,31 @@ package body AlertLogPkg is
         if AlertLogID = AlertLogPtr(i).ParentID then
           if ReportAll or SumAlertCount(AlertLogPtr(i).AlertCount) > 0 then
             write(buf, "  <" & "alert" & '>');
-            WriteLineXml(buf);
+            WriteLine(f, buf);
             write(buf, "    <" & "alertname" & '>');
             write(buf, AlertLogPtr(i).Name.all);
             write(buf, '<' & "/alertname" & '>');
-            WriteLineXml(buf);
+            WriteLine(f, buf);
             write(buf, "    <" & "failcount" & '>');
             write(buf, to_string(AlertLogPtr(i).AlertCount(FAILURE)));
             write(buf, '<' & "/failcount" & '>');
-            WriteLineXml(buf);
+            WriteLine(f, buf);
             write(buf, "    <" & "errcount" & '>');
             write(buf, to_string(AlertLogPtr(i).AlertCount(ERROR)));
             write(buf, '<' & "/errcount" & '>');
-            WriteLineXml(buf);
+            WriteLine(f, buf);
             write(buf, "    <" & "warncount" & '>');
             write(buf, to_string(AlertLogPtr(i).AlertCount(WARNING)));
             write(buf, '<' & "/warncount" & '>');
-            WriteLineXml(buf);
+            WriteLine(f, buf);
             write(buf, "    <" & "passcount" & '>');
             write(buf, to_string(AlertLogPtr(i).AlertCount(PASSING)));
             write(buf, '<' & "/passcount" & '>');
-            WriteLineXml(buf);
+            WriteLine(f, buf);
             write(buf, "  <" & "/alert" & '>');
-            WriteLineXml(buf);
+            WriteLine(f, buf);
           end if;
-          PrintChildXml(AlertLogID => i, ReportAll  => ReportAll);
+          PrintChildXml(f => f, AlertLogID => i, ReportAll  => ReportAll);
         end if;
       end loop;
     end procedure PrintChildXml;
@@ -866,25 +866,23 @@ package body AlertLogPkg is
 
     ------------------------------------------------------------
     -- PT Local
-    procedure PrintXmlHeader is
+    procedure PrintXmlHeader(file f : text) is
     ------------------------------------------------------------
       variable buf : line;
     begin
-      write(buf, '<' & "?xml version='1.0'?" & '>');
-      WriteLineXml(buf);
       write(buf, '<' & "osvvm_coverage_report" & '>');
-      WriteLineXml(buf);
+      WriteLine(f, buf);
     end procedure PrintXmlHeader;
 
 
     ------------------------------------------------------------
     -- PT Local
-    procedure PrintXmlFooter is
+    procedure PrintXmlFooter(file f : text) is
     ------------------------------------------------------------
       variable buf : line;
     begin
       write(buf, '<' & "/osvvm_coverage_report" & '>');
-      WriteLineXml(buf);
+      WriteLine(f, buf);
     end procedure PrintXmlFooter;
 
 
@@ -927,9 +925,11 @@ package body AlertLogPkg is
           IndentAmount  => 2,
           ReportAll     => ReportAll
         );
-        PrintXmlHeader;
-        PrintChildXml(AlertLogID => AlertLogID, ReportAll  => ReportAll);
-        PrintXmlFooter;
+        if IsAlertXmlEnabled then
+          PrintXmlHeader(f => AlertXmlFile);
+          PrintChildXml(f => AlertXmlFile, AlertLogID => AlertLogID, ReportAll  => ReportAll);
+          PrintXmlFooter(f => AlertXmlFile);
+        end if;
       end if ; 
     end procedure ReportAlerts ; 
     
@@ -2416,6 +2416,7 @@ package body AlertLogPkg is
   ) is
   begin
     AlertLogStruct.Log(AlertLogID, Message, Level, Enable) ; 
+    AlertLogStruct.IncAlertCount(AlertLogID, PASSING);
   end procedure log ;
   
   ------------------------------------------------------------
