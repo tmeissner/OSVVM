@@ -2786,6 +2786,87 @@ package body CoveragePkg is
     end procedure WriteBin ;
 
     ------------------------------------------------------------
+    --  pt local for now -- file formal parameter not allowed with method
+    procedure WriteBin2Xml (
+      file f : text ;
+      WritePassFail   : CovOptionsType ;
+      WriteBinInfo    : CovOptionsType ;
+      WriteCount      : CovOptionsType ;
+      WriteAnyIllegal : CovOptionsType ;
+      WritePrefix     : string ;
+      PassName        : string ;
+      FailName        : string
+    ) is
+    ------------------------------------------------------------
+      variable buf : line ;
+    begin
+      write(buf, '<' & "osvvm_bin_report" & '>');
+      WriteLine(f, buf);
+      -- Models with Bins
+      write(buf, "  <" & "name" & '>');
+      write(buf, GetName);
+      write(buf, "<" & "/name" & '>');
+      WriteLine(f, buf);
+      for i in 1 to NumBins loop      -- CovBinPtr.all'range
+        if CovBinPtr(i).action = COV_COUNT or
+           (CovBinPtr(i).action = COV_ILLEGAL and IsEnabled(WriteAnyIllegal)) or
+           CovBinPtr(i).count < 0  -- Illegal bin with errors
+        then
+          write(buf, "  <" & "bin" & '>');
+          WriteLine(f, buf);
+          -- WriteBin Name
+          write(buf, "    <" & "name" & '>');
+          write(buf, CovBinPtr(i).Name.all);
+          write(buf, "<" & "/name" & '>');
+          WriteLine(f, buf);
+          -- For illegal bins, AtLeast = 0 and count is negative.
+          write(buf, "    <" & "success" & '>');
+          if CovBinPtr(i).count >= CovBinPtr(i).AtLeast then
+            write(buf, PassName);
+          else
+            write(buf, FailName);
+          end if ;
+          write(buf, "<" & "/success" & '>');
+          WriteLine(f, buf);
+          if IsEnabled(WriteBinInfo) then
+            if CovBinPtr(i).action = COV_COUNT then
+              write(buf, "    <" & "value" & '>');
+              write(buf, CovBinPtr(i).BinVal.all);
+              write(buf, "<" & "value" & '>');
+            else
+              write(buf, "    <" & "illegal" & '>');
+              write(buf, CovBinPtr(i).BinVal.all);
+              write(buf, "<" & "/illegal" & '>');
+            end if;
+            WriteLine(f, buf);
+          end if ;
+          if IsEnabled(WriteCount) then
+            write(buf, "    <" & "count" & '>');
+            write(buf, integer'image(abs(CovBinPtr(i).count)));
+            write(buf, "<" & "/count" & '>');
+            WriteLine(f, buf);
+            write(buf, "    <" & "atleast" & '>');
+            write(buf, integer'image(CovBinPtr(i).AtLeast));
+            write(buf, "<" & "/atleast" & '>');
+            WriteLine(f, buf);
+            if WeightMode = WEIGHT or WeightMode = REMAIN_WEIGHT then
+              -- Print Weight only when it is used
+              write(buf, "    <" & "weight" & '>');
+              write(buf, integer'image(CovBinPtr(i).Weight));
+              write(buf, "<" & "/weight" & '>');
+              WriteLine(f, buf);
+            end if ;
+          end if ;
+          write(buf, "  <" & "/bin" & '>');
+          WriteLine(f, buf);
+        end if ;
+      end loop ;
+      write(buf, '<' & "/osvvm_bin_report" & '>');
+      WriteLine(f, buf);
+    end procedure WriteBin2Xml ;
+
+
+    ------------------------------------------------------------
     procedure WriteBin (
     ------------------------------------------------------------
       WritePassFail   : CovOptionsType := COV_OPT_INIT_PARM_DETECT ;
@@ -2840,7 +2921,7 @@ package body CoveragePkg is
             PassName        => rPassName,
             FailName        => rFailName
           ) ;
-        end if ; 
+        end if ;
       else
         -- Default Write to OUTPUT
         WriteBin (
@@ -2854,7 +2935,18 @@ package body CoveragePkg is
           FailName        => rFailName
         ) ;
       end if ;
-      
+      if IsCoverXmlEnabled then
+        WriteBin2Xml (
+          f               => CoverXmlFile,
+          WritePassFail   => rWritePassFail,
+          WriteBinInfo    => rWriteBinInfo,
+          WriteCount      => rWriteCount,
+          WriteAnyIllegal => rWriteAnyIllegal,
+          WritePrefix     => rWritePrefix,
+          PassName        => rPassName,
+          FailName        => rFailName
+        );
+      end if;
     end procedure WriteBin ;
     
     

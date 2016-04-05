@@ -50,7 +50,8 @@ package TranscriptPkg is
 
   -- File Identifier to facilitate usage of one transcript file 
   file             TranscriptFile : text ;
-  file             XmlFile : text ;
+  file             AlertXmlFile   : text ;
+  file             CoverXmlFile   : text ;
   
   -- Cause compile errors if READ_MODE is passed to TranscriptOpen
   subtype WRITE_APPEND_OPEN_KIND is FILE_OPEN_KIND range WRITE_MODE to APPEND_MODE ; 
@@ -60,8 +61,14 @@ package TranscriptPkg is
   procedure        TranscriptOpen (ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) ;  
   impure function  TranscriptOpen (ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) return FILE_OPEN_STATUS ;
 
-  procedure        XmlOpen (ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE);
-  procedure        XmlClose;  
+  procedure        AlertXmlOpen (ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE);
+  alias            XmlOpen is AlertXmlOpen[STRING, WRITE_APPEND_OPEN_KIND];
+  procedure        CoverXmlOpen (ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE);
+  procedure        XmlClose;
+  impure function  IsAlertXmlOpen return boolean;
+  alias            IsAlertXmlEnabled is IsAlertXmlOpen [return boolean];
+  impure function  IsCoverXmlOpen return boolean;
+  alias            IsCoverXmlEnabled is IsCoverXmlOpen [return boolean];
   
   procedure        TranscriptClose ;  
   impure function  IsTranscriptOpen return boolean ; 
@@ -74,7 +81,6 @@ package TranscriptPkg is
 
   -- Write to TranscriptFile when open.  Write to OUTPUT when not open or IsTranscriptMirrored
   procedure        WriteLine(buf : inout line)  ; 
-  procedure        WriteLineXml(buf : inout line)  ; 
   procedure        Print(s : string) ; 
 
 end TranscriptPkg ;
@@ -104,7 +110,8 @@ package body TranscriptPkg is
   ------------------------------------------------------------
   shared variable TranscriptEnable : LocalBooleanPType ; 
   shared variable TranscriptMirror : LocalBooleanPType ; 
-  shared variable XmlEnable : LocalBooleanPType ; 
+  shared variable AlertXmlEnable   : LocalBooleanPType ; 
+  shared variable CoverXmlEnable   : LocalBooleanPType ; 
 
   ------------------------------------------------------------
   procedure TranscriptOpen (Status: out FILE_OPEN_STATUS; ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) is
@@ -116,16 +123,6 @@ package body TranscriptPkg is
     end if ; 
   end procedure TranscriptOpen ;
 
-  ------------------------------------------------------------
-  procedure XmlOpen (Status: out FILE_OPEN_STATUS; ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) is
-  ------------------------------------------------------------
-  begin
-    file_open(Status, XmlFile, ExternalName, OpenKind) ;
-    if Status = OPEN_OK then 
-      XmlEnable.Set(TRUE) ;
-    end if ; 
-  end procedure XmlOpen ;
-  
   ------------------------------------------------------------
   procedure TranscriptOpen (ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) is
   ------------------------------------------------------------
@@ -139,17 +136,39 @@ package body TranscriptPkg is
   end procedure TranscriptOpen ;
 
 
-  procedure XmlOpen (ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) is
+  procedure AlertXmlOpen (ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) is
   ------------------------------------------------------------
     variable Status : FILE_OPEN_STATUS ; 
+    variable buf : line ;
   begin
-    XmlOpen(Status, ExternalName, OpenKind) ;
+    file_open(Status, AlertXmlFile, ExternalName, OpenKind) ;
+    if Status = OPEN_OK then 
+      AlertXmlEnable.Set(TRUE) ;
+      write(buf, '<' & "?xml version='1.0'?" & '>');
+      WriteLine(AlertXmlFile, buf);
+    end if ; 
     if Status /= OPEN_OK then 
-      report "TranscriptPkg.XmlOpen file: " & 
+      report "TranscriptPkg.AlertXmlOpen file: " & 
              ExternalName & " status is: " & to_string(status) & " and is not OPEN_OK" severity FAILURE ;
     end if ; 
-  end procedure XmlOpen;
+  end procedure AlertXmlOpen;
   
+  procedure CoverXmlOpen (ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) is
+  ------------------------------------------------------------
+    variable Status : FILE_OPEN_STATUS ; 
+    variable buf : line ;
+  begin
+    file_open(Status, CoverXmlFile, ExternalName, OpenKind) ;
+    if Status = OPEN_OK then 
+      CoverXmlEnable.Set(TRUE) ;
+      write(buf, '<' & "?xml version='1.0'?" & '>');
+      WriteLine(CoverXmlFile, buf);
+    else
+      report "TranscriptPkg.CoverXmlOpen file: " & 
+             ExternalName & " status is: " & to_string(status) & " and is not OPEN_OK" severity FAILURE ;
+    end if ; 
+  end procedure CoverXmlOpen;
+
   ------------------------------------------------------------
   impure function  TranscriptOpen (ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) return FILE_OPEN_STATUS is
   ------------------------------------------------------------
@@ -173,10 +192,14 @@ package body TranscriptPkg is
   procedure XmlClose is
   ------------------------------------------------------------
   begin
-    if XmlEnable.Get then
-      file_close(XmlFile) ;
-    end if ; 
-    XmlEnable.Set(FALSE) ;
+    if AlertXmlEnable.Get then
+      file_close(AlertXmlFile) ;
+    end if ;
+    AlertXmlEnable.Set(FALSE) ;
+    if CoverXmlEnable.Get then
+      file_close(CoverXmlFile) ;
+    end if ;
+    CoverXmlEnable.Set(FALSE) ;
   end procedure XmlClose ; 
   
   ------------------------------------------------------------
@@ -186,6 +209,20 @@ package body TranscriptPkg is
     return TranscriptEnable.Get ;
   end function IsTranscriptOpen ;
   
+  ------------------------------------------------------------
+  impure function IsAlertXmlOpen return boolean is
+  ------------------------------------------------------------
+  begin
+    return AlertXmlEnable.Get ;
+  end function IsAlertXmlOpen ;
+
+  ------------------------------------------------------------
+  impure function IsCoverXmlOpen return boolean is
+  ------------------------------------------------------------
+  begin
+    return CoverXmlEnable.Get ;
+  end function IsCoverXmlOpen ;
+
   ------------------------------------------------------------
   procedure SetTranscriptMirror (A : boolean := TRUE) is 
   ------------------------------------------------------------
@@ -212,17 +249,6 @@ package body TranscriptPkg is
       WriteLine(TranscriptFile, buf) ; 
     end if ; 
   end procedure WriteLine ;
-
-  ------------------------------------------------------------
-  procedure WriteLineXml(buf : inout line) is 
-  ------------------------------------------------------------
-  begin
-    if not XmlEnable.Get then
-      report "No XML file open to write!";
-    else
-      WriteLine(XmlFile, buf);
-    end if;
-  end procedure WriteLineXml ; 
 
   ------------------------------------------------------------
   procedure Print(s : string) is 
