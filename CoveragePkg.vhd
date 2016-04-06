@@ -2818,42 +2818,42 @@ package body CoveragePkg is
     ------------------------------------------------------------
       variable buf : line ;
     begin
-      OpenXmlTag(f, "osvvm_bin_report");
+      OpenXmlTag(f, "report", 1);
       -- Models with Bins
-      WriteXmlEntry(f, "name", GetName, 1);
+      WriteXmlEntry(f, "name", GetName, 2);
       for i in 1 to NumBins loop
         if CovBinPtr(i).action = COV_COUNT or
            (CovBinPtr(i).action = COV_ILLEGAL and IsEnabled(WriteAnyIllegal)) or
            CovBinPtr(i).count < 0  -- Illegal bin with errors
         then
-          OpenXmlTag(f, "bin", 1);
+          OpenXmlTag(f, "bin", 2);
           -- WriteBin Name
-          WriteXmlEntry(f, "name", CovBinPtr(i).Name.all, 2);
+          WriteXmlEntry(f, "name", CovBinPtr(i).Name.all, 3);
           -- For illegal bins, AtLeast = 0 and count is negative.
           if CovBinPtr(i).count >= CovBinPtr(i).AtLeast then
-            WriteXmlEntry(f, "success", PassName, 2);
+            WriteXmlEntry(f, "success", PassName, 3);
           else
-            WriteXmlEntry(f, "success", FailName, 2);
+            WriteXmlEntry(f, "success", FailName, 3);
           end if ;
           if IsEnabled(WriteBinInfo) then
             if CovBinPtr(i).action = COV_COUNT then
-              WriteXmlEntry(f, "value", CovBinPtr(i).BinVal.all, 2);
+              WriteXmlEntry(f, "value", CovBinPtr(i).BinVal.all, 3);
             else
-              WriteXmlEntry(f, "illegal", CovBinPtr(i).BinVal.all, 2);
+              WriteXmlEntry(f, "illegal", CovBinPtr(i).BinVal.all, 3);
             end if;
           end if ;
           if IsEnabled(WriteCount) then
-            WriteXmlEntry(f, "count", integer'image(abs(CovBinPtr(i).count)), 2);
-            WriteXmlEntry(f, "atleast", integer'image(CovBinPtr(i).AtLeast), 2);
+            WriteXmlEntry(f, "count", integer'image(abs(CovBinPtr(i).count)), 3);
+            WriteXmlEntry(f, "atleast", integer'image(CovBinPtr(i).AtLeast), 3);
             if WeightMode = WEIGHT or WeightMode = REMAIN_WEIGHT then
               -- Print Weight only when it is used
-              WriteXmlEntry(f, "weight", integer'image(CovBinPtr(i).Weight), 2);
+              WriteXmlEntry(f, "weight", integer'image(CovBinPtr(i).Weight), 3);
             end if;
           end if ;
-          CloseXmlTag(f, "bin", 1);
+          CloseXmlTag(f, "bin", 2);
         end if ;
       end loop ;
-      CloseXmlTag(f, "osvvm_bin_report");
+      CloseXmlTag(f, "report", 1);
     end procedure WriteBin2Xml ;
 
 

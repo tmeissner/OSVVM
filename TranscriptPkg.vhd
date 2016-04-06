@@ -142,6 +142,47 @@ package body TranscriptPkg is
   end procedure TranscriptOpen ;
 
 
+  procedure OpenXmlTag (file f : text; Tag : string; Indent : natural := 0) is
+    variable buf : line;
+  begin
+    if Indent /= 0 then
+      for i in 0 to Indent-1 loop
+        swrite(buf, "    ");
+      end loop;
+    end if;
+    write(buf, '<' & Tag & '>');
+    WriteLine(f, buf);
+  end procedure OpenXmlTag;
+
+
+  procedure CloseXmlTag (file f : text; Tag : string; Indent : natural := 0) is
+    variable buf : line;
+  begin
+    if Indent /= 0 then
+      for i in 0 to Indent-1 loop
+        swrite(buf, "    ");
+      end loop;
+    end if;
+    write(buf, "</" & Tag & '>');
+    WriteLine(f, buf);
+  end procedure CloseXmlTag;
+
+
+  procedure WriteXmlEntry(file f : text; Tag : string; Value: string; Indent : natural := 0) is
+    variable buf : line ;
+  begin
+    OpenXmlTag(f, Tag, Indent);
+    if Indent /= 0 then
+      for i in 0 to Indent loop
+        swrite(buf, "    ");
+      end loop;
+    end if;
+    write(buf,Value);
+    WriteLine(f, buf);
+    CloseXmlTag(f, Tag, Indent);
+  end procedure WriteXmlEntry;
+
+
   procedure AlertXmlOpen (ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) is
   ------------------------------------------------------------
     variable Status : FILE_OPEN_STATUS ; 
@@ -150,8 +191,7 @@ package body TranscriptPkg is
     file_open(Status, AlertXmlFile, ExternalName, OpenKind) ;
     if Status = OPEN_OK then 
       AlertXmlEnable.Set(TRUE) ;
-      write(buf, '<' & "?xml version='1.0'?" & '>');
-      WriteLine(AlertXmlFile, buf);
+      OpenXmlTag(AlertXmlFile, "?xml version='1.0'?");
     end if ; 
     if Status /= OPEN_OK then 
       report "TranscriptPkg.AlertXmlOpen file: " & 
@@ -167,13 +207,29 @@ package body TranscriptPkg is
     file_open(Status, CoverXmlFile, ExternalName, OpenKind) ;
     if Status = OPEN_OK then 
       CoverXmlEnable.Set(TRUE) ;
-      write(buf, '<' & "?xml version='1.0'?" & '>');
-      WriteLine(CoverXmlFile, buf);
+      OpenXmlTag(CoverXmlFile, "?xml version='1.0'?");
+      OpenXmlTag(CoverXmlFile, "osvvm_bin_coverage_report");
     else
       report "TranscriptPkg.CoverXmlOpen file: " & 
              ExternalName & " status is: " & to_string(status) & " and is not OPEN_OK" severity FAILURE ;
     end if ; 
   end procedure CoverXmlOpen;
+
+  ------------------------------------------------------------
+  procedure XmlClose is
+  ------------------------------------------------------------
+    variable buf : line ;
+  begin
+    if AlertXmlEnable.Get then
+      file_close(AlertXmlFile) ;
+    end if ;
+    AlertXmlEnable.Set(FALSE) ;
+    if CoverXmlEnable.Get then
+      CloseXmlTag(CoverXmlFile, "osvvm_bin_coverage_report");
+      file_close(CoverXmlFile) ;
+    end if ;
+    CoverXmlEnable.Set(FALSE) ;
+  end procedure XmlClose ; 
 
   ------------------------------------------------------------
   impure function  TranscriptOpen (ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) return FILE_OPEN_STATUS is
@@ -193,20 +249,6 @@ package body TranscriptPkg is
     end if ; 
     TranscriptEnable.Set(FALSE) ;
   end procedure TranscriptClose ; 
-
-  ------------------------------------------------------------
-  procedure XmlClose is
-  ------------------------------------------------------------
-  begin
-    if AlertXmlEnable.Get then
-      file_close(AlertXmlFile) ;
-    end if ;
-    AlertXmlEnable.Set(FALSE) ;
-    if CoverXmlEnable.Get then
-      file_close(CoverXmlFile) ;
-    end if ;
-    CoverXmlEnable.Set(FALSE) ;
-  end procedure XmlClose ; 
   
   ------------------------------------------------------------
   impure function IsTranscriptOpen return boolean is
@@ -264,47 +306,6 @@ package body TranscriptPkg is
     write(buf, s) ; 
     WriteLine(buf) ; 
   end procedure Print ;
-
-
-  procedure OpenXmlTag (file f : text; Tag : string; Indent : natural := 0) is
-    variable buf : line;
-  begin
-    if Indent /= 0 then
-      for i in 0 to Indent-1 loop
-        swrite(buf, "    ");
-      end loop;
-    end if;
-    write(buf, '<' & Tag & '>');
-    WriteLine(f, buf);
-  end procedure OpenXmlTag;
-
-
-  procedure CloseXmlTag (file f : text; Tag : string; Indent : natural := 0) is
-    variable buf : line;
-  begin
-    if Indent /= 0 then
-      for i in 0 to Indent-1 loop
-        swrite(buf, "    ");
-      end loop;
-    end if;
-    write(buf, "</" & Tag & '>');
-    WriteLine(f, buf);
-  end procedure CloseXmlTag;
-
-
-  procedure WriteXmlEntry(file f : text; Tag : string; Value: string; Indent : natural := 0) is
-    variable buf : line ;
-  begin
-    OpenXmlTag(f, Tag, Indent);
-    if Indent /= 0 then
-      for i in 0 to Indent loop
-        swrite(buf, "    ");
-      end loop;
-    end if;
-    write(buf,Value);
-    WriteLine(f, buf);
-    CloseXmlTag(f, Tag, Indent);
-  end procedure WriteXmlEntry;
 
 
 end package body TranscriptPkg ;
