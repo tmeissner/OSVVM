@@ -833,30 +833,13 @@ package body AlertLogPkg is
       for i in AlertLogID+1 to NumAlertLogIDsVar loop
         if AlertLogID = AlertLogPtr(i).ParentID then
           if ReportAll or SumAlertCount(AlertLogPtr(i).AlertCount) > 0 then
-            write(buf, "  <" & "alert" & '>');
-            WriteLine(f, buf);
-            write(buf, "    <" & "alertname" & '>');
-            write(buf, AlertLogPtr(i).Name.all);
-            write(buf, '<' & "/alertname" & '>');
-            WriteLine(f, buf);
-            write(buf, "    <" & "failcount" & '>');
-            write(buf, to_string(AlertLogPtr(i).AlertCount(FAILURE)));
-            write(buf, '<' & "/failcount" & '>');
-            WriteLine(f, buf);
-            write(buf, "    <" & "errcount" & '>');
-            write(buf, to_string(AlertLogPtr(i).AlertCount(ERROR)));
-            write(buf, '<' & "/errcount" & '>');
-            WriteLine(f, buf);
-            write(buf, "    <" & "warncount" & '>');
-            write(buf, to_string(AlertLogPtr(i).AlertCount(WARNING)));
-            write(buf, '<' & "/warncount" & '>');
-            WriteLine(f, buf);
-            write(buf, "    <" & "passcount" & '>');
-            write(buf, to_string(AlertLogPtr(i).AlertCount(PASSING)));
-            write(buf, '<' & "/passcount" & '>');
-            WriteLine(f, buf);
-            write(buf, "  <" & "/alert" & '>');
-            WriteLine(f, buf);
+            OpenXmlTag(f, "alert", 1);
+            WriteXmlEntry(f, "alertname", AlertLogPtr(i).Name.all, 2);
+            WriteXmlEntry(f, "failcount", to_string(AlertLogPtr(i).AlertCount(FAILURE)), 2);
+            WriteXmlEntry(f, "errcount", to_string(AlertLogPtr(i).AlertCount(ERROR)), 2);
+            WriteXmlEntry(f, "warncount", to_string(AlertLogPtr(i).AlertCount(WARNING)), 2);
+            WriteXmlEntry(f, "passcount", to_string(AlertLogPtr(i).AlertCount(PASSING)), 2);
+            CloseXmlTag(f, "alert", 1);
           end if;
           PrintChildXml(f => f, AlertLogID => i, ReportAll  => ReportAll);
         end if;
@@ -870,8 +853,7 @@ package body AlertLogPkg is
     ------------------------------------------------------------
       variable buf : line;
     begin
-      write(buf, '<' & "osvvm_coverage_report" & '>');
-      WriteLine(f, buf);
+      OpenXmlTag(f, "osvvm_coverage_report");
     end procedure PrintXmlHeader;
 
 
@@ -881,8 +863,7 @@ package body AlertLogPkg is
     ------------------------------------------------------------
       variable buf : line;
     begin
-      write(buf, '<' & "/osvvm_coverage_report" & '>');
-      WriteLine(f, buf);
+      CloseXmlTag(f, "osvvm_coverage_report");
     end procedure PrintXmlFooter;
 
 
