@@ -2785,6 +2785,24 @@ package body CoveragePkg is
       writeline(f, buf) ;
     end procedure WriteBin ;
 
+
+    ------------------------------------------------------------
+    --  PT Local: overload to write BIN values in XML
+    procedure WriteXmlEntry(file f : text; Tag : string; Value: RangeArrayType; Indent : natural := 0) is
+      variable buf : line ;
+    begin
+      OpenXmlTag(f, Tag, Indent);
+      if Indent /= 0 then
+        for i in 0 to Indent loop
+          swrite(buf, "    ");
+        end loop;
+      end if;
+      write(buf, Value);
+      WriteLine(f, buf);
+      CloseXmlTag(f, Tag, Indent);
+    end procedure WriteXmlEntry;
+
+
     ------------------------------------------------------------
     --  pt local for now -- file formal parameter not allowed with method
     procedure WriteBin2Xml (
@@ -2800,69 +2818,42 @@ package body CoveragePkg is
     ------------------------------------------------------------
       variable buf : line ;
     begin
-      write(buf, '<' & "osvvm_bin_report" & '>');
-      WriteLine(f, buf);
+      OpenXmlTag(f, "osvvm_bin_report");
       -- Models with Bins
-      write(buf, "  <" & "name" & '>');
-      write(buf, GetName);
-      write(buf, "<" & "/name" & '>');
-      WriteLine(f, buf);
-      for i in 1 to NumBins loop      -- CovBinPtr.all'range
+      WriteXmlEntry(f, "name", GetName, 1);
+      for i in 1 to NumBins loop
         if CovBinPtr(i).action = COV_COUNT or
            (CovBinPtr(i).action = COV_ILLEGAL and IsEnabled(WriteAnyIllegal)) or
            CovBinPtr(i).count < 0  -- Illegal bin with errors
         then
-          write(buf, "  <" & "bin" & '>');
-          WriteLine(f, buf);
+          OpenXmlTag(f, "bin", 1);
           -- WriteBin Name
-          write(buf, "    <" & "name" & '>');
-          write(buf, CovBinPtr(i).Name.all);
-          write(buf, "<" & "/name" & '>');
-          WriteLine(f, buf);
+          WriteXmlEntry(f, "name", CovBinPtr(i).Name.all, 2);
           -- For illegal bins, AtLeast = 0 and count is negative.
-          write(buf, "    <" & "success" & '>');
           if CovBinPtr(i).count >= CovBinPtr(i).AtLeast then
-            write(buf, PassName);
+            WriteXmlEntry(f, "success", PassName, 2);
           else
-            write(buf, FailName);
+            WriteXmlEntry(f, "success", FailName, 2);
           end if ;
-          write(buf, "<" & "/success" & '>');
-          WriteLine(f, buf);
           if IsEnabled(WriteBinInfo) then
             if CovBinPtr(i).action = COV_COUNT then
-              write(buf, "    <" & "value" & '>');
-              write(buf, CovBinPtr(i).BinVal.all);
-              write(buf, "<" & "value" & '>');
+              WriteXmlEntry(f, "value", CovBinPtr(i).BinVal.all, 2);
             else
-              write(buf, "    <" & "illegal" & '>');
-              write(buf, CovBinPtr(i).BinVal.all);
-              write(buf, "<" & "/illegal" & '>');
+              WriteXmlEntry(f, "illegal", CovBinPtr(i).BinVal.all, 2);
             end if;
-            WriteLine(f, buf);
           end if ;
           if IsEnabled(WriteCount) then
-            write(buf, "    <" & "count" & '>');
-            write(buf, integer'image(abs(CovBinPtr(i).count)));
-            write(buf, "<" & "/count" & '>');
-            WriteLine(f, buf);
-            write(buf, "    <" & "atleast" & '>');
-            write(buf, integer'image(CovBinPtr(i).AtLeast));
-            write(buf, "<" & "/atleast" & '>');
-            WriteLine(f, buf);
+            WriteXmlEntry(f, "count", integer'image(abs(CovBinPtr(i).count)), 2);
+            WriteXmlEntry(f, "atleast", integer'image(CovBinPtr(i).AtLeast), 2);
             if WeightMode = WEIGHT or WeightMode = REMAIN_WEIGHT then
               -- Print Weight only when it is used
-              write(buf, "    <" & "weight" & '>');
-              write(buf, integer'image(CovBinPtr(i).Weight));
-              write(buf, "<" & "/weight" & '>');
-              WriteLine(f, buf);
-            end if ;
+              WriteXmlEntry(f, "weight", integer'image(CovBinPtr(i).Weight), 2);
+            end if;
           end if ;
-          write(buf, "  <" & "/bin" & '>');
-          WriteLine(f, buf);
+          CloseXmlTag(f, "bin", 1);
         end if ;
       end loop ;
-      write(buf, '<' & "/osvvm_bin_report" & '>');
-      WriteLine(f, buf);
+      CloseXmlTag(f, "osvvm_bin_report");
     end procedure WriteBin2Xml ;
 
 

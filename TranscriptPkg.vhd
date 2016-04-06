@@ -83,6 +83,12 @@ package TranscriptPkg is
   procedure        WriteLine(buf : inout line)  ; 
   procedure        Print(s : string) ; 
 
+
+  procedure OpenXmlTag (file f : text; Tag : string; Indent : natural := 0);
+  procedure CloseXmlTag (file f : text; Tag : string; Indent : natural := 0);
+  procedure WriteXmlEntry(file f : text; Tag : string; Value: string; Indent : natural := 0);
+
+
 end TranscriptPkg ;
   
 --- ///////////////////////////////////////////////////////////////////////////
@@ -257,6 +263,48 @@ package body TranscriptPkg is
   begin
     write(buf, s) ; 
     WriteLine(buf) ; 
-  end procedure Print ; 
+  end procedure Print ;
+
+
+  procedure OpenXmlTag (file f : text; Tag : string; Indent : natural := 0) is
+    variable buf : line;
+  begin
+    if Indent /= 0 then
+      for i in 0 to Indent-1 loop
+        swrite(buf, "    ");
+      end loop;
+    end if;
+    write(buf, '<' & Tag & '>');
+    WriteLine(f, buf);
+  end procedure OpenXmlTag;
+
+
+  procedure CloseXmlTag (file f : text; Tag : string; Indent : natural := 0) is
+    variable buf : line;
+  begin
+    if Indent /= 0 then
+      for i in 0 to Indent-1 loop
+        swrite(buf, "    ");
+      end loop;
+    end if;
+    write(buf, "</" & Tag & '>');
+    WriteLine(f, buf);
+  end procedure CloseXmlTag;
+
+
+  procedure WriteXmlEntry(file f : text; Tag : string; Value: string; Indent : natural := 0) is
+    variable buf : line ;
+  begin
+    OpenXmlTag(f, Tag, Indent);
+    if Indent /= 0 then
+      for i in 0 to Indent loop
+        swrite(buf, "    ");
+      end loop;
+    end if;
+    write(buf,Value);
+    WriteLine(f, buf);
+    CloseXmlTag(f, Tag, Indent);
+  end procedure WriteXmlEntry;
+
 
 end package body TranscriptPkg ;
