@@ -2821,6 +2821,7 @@ package body CoveragePkg is
       OpenXmlTag(f, "report", 1);
       -- Models with Bins
       WriteXmlEntry(f, "name", GetName, 2);
+      WriteXmlEntry(f, "coverage", to_string(GetCov, 2) & "%", 2);
       for i in 1 to NumBins loop
         if CovBinPtr(i).action = COV_COUNT or
            (CovBinPtr(i).action = COV_ILLEGAL and IsEnabled(WriteAnyIllegal)) or
@@ -2829,19 +2830,22 @@ package body CoveragePkg is
           OpenXmlTag(f, "bin", 2);
           -- WriteBin Name
           WriteXmlEntry(f, "name", CovBinPtr(i).Name.all, 3);
-          -- For illegal bins, AtLeast = 0 and count is negative.
-          if CovBinPtr(i).count >= CovBinPtr(i).AtLeast then
-            WriteXmlEntry(f, "success", PassName, 3);
-          else
-            WriteXmlEntry(f, "success", FailName, 3);
-          end if ;
-          if IsEnabled(WriteBinInfo) then
-            if CovBinPtr(i).action = COV_COUNT then
-              WriteXmlEntry(f, "value", CovBinPtr(i).BinVal.all, 3);
+          if IsEnabled(WritePassFail) then
+            -- For illegal bins, AtLeast = 0 and count is negative.
+            if CovBinPtr(i).count >= CovBinPtr(i).AtLeast then
+              WriteXmlEntry(f, "covered", "yes", 3);
             else
-              WriteXmlEntry(f, "illegal", CovBinPtr(i).BinVal.all, 3);
-            end if;
+              WriteXmlEntry(f, "covered", "no", 3);
+            end if ;
           end if ;
+          if CovBinPtr(i).action = COV_COUNT then
+            WriteXmlEntry(f, "type", "normal", 3);
+          else
+            WriteXmlEntry(f, "type", "illegal", 3);
+          end if;
+          if IsEnabled(WriteBinInfo) then
+            WriteXmlEntry(f, "value", CovBinPtr(i).BinVal.all, 3);
+          end if;
           if IsEnabled(WriteCount) then
             WriteXmlEntry(f, "count", integer'image(abs(CovBinPtr(i).count)), 3);
             WriteXmlEntry(f, "atleast", integer'image(CovBinPtr(i).AtLeast), 3);
