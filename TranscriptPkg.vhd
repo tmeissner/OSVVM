@@ -57,13 +57,13 @@ package TranscriptPkg is
   subtype WRITE_APPEND_OPEN_KIND is FILE_OPEN_KIND range WRITE_MODE to APPEND_MODE ; 
   
   -- Open and close TranscriptFile.  Function allows declarative opens 
-  procedure        TranscriptOpen (Status: out FILE_OPEN_STATUS; ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) ;
-  procedure        TranscriptOpen (ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) ;  
-  impure function  TranscriptOpen (ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) return FILE_OPEN_STATUS ;
+  procedure        TranscriptOpen (Status: out FILE_OPEN_STATUS; ExternalName: STRING := "../log/osvvm_transcript.txt"; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) ;
+  procedure        TranscriptOpen (ExternalName: STRING := "../log/osvvm_transcript.txt"; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) ;  
+  impure function  TranscriptOpen (ExternalName: STRING := "../log/osvvm_transcript.txt"; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) return FILE_OPEN_STATUS ;
 
-  procedure        AlertXmlOpen (ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE);
+  procedure        AlertXmlOpen (ExternalName: STRING := "../log/osvvm_alert_coverage.xml"; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE);
   alias            XmlOpen is AlertXmlOpen[STRING, WRITE_APPEND_OPEN_KIND];
-  procedure        CoverXmlOpen (ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE);
+  procedure        CoverXmlOpen (ExternalName: STRING := "../log/osvvm_bin_coverage.xml"; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE);
   procedure        XmlClose;
   impure function  IsAlertXmlOpen return boolean;
   alias            IsAlertXmlEnabled is IsAlertXmlOpen [return boolean];
@@ -120,7 +120,7 @@ package body TranscriptPkg is
   shared variable CoverXmlEnable   : LocalBooleanPType ; 
 
   ------------------------------------------------------------
-  procedure TranscriptOpen (Status: out FILE_OPEN_STATUS; ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) is
+  procedure TranscriptOpen (Status: out FILE_OPEN_STATUS; ExternalName: STRING := "../log/osvvm_transcript.txt"; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) is
   ------------------------------------------------------------
   begin
     file_open(Status, TranscriptFile, ExternalName, OpenKind) ;
@@ -130,7 +130,7 @@ package body TranscriptPkg is
   end procedure TranscriptOpen ;
 
   ------------------------------------------------------------
-  procedure TranscriptOpen (ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) is
+  procedure TranscriptOpen (ExternalName: STRING := "../log/osvvm_transcript.txt"; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) is
   ------------------------------------------------------------
     variable Status : FILE_OPEN_STATUS ; 
   begin
@@ -183,7 +183,7 @@ package body TranscriptPkg is
   end procedure WriteXmlEntry;
 
 
-  procedure AlertXmlOpen (ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) is
+  procedure AlertXmlOpen (ExternalName: STRING := "../log/osvvm_alert_coverage.xml"; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) is
   ------------------------------------------------------------
     variable Status : FILE_OPEN_STATUS ; 
     variable buf : line ;
@@ -199,7 +199,7 @@ package body TranscriptPkg is
     end if ; 
   end procedure AlertXmlOpen;
   
-  procedure CoverXmlOpen (ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) is
+  procedure CoverXmlOpen (ExternalName: STRING := "../log/osvvm_bin_coverage.xml"; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) is
   ------------------------------------------------------------
     variable Status : FILE_OPEN_STATUS ; 
     variable buf : line ;
@@ -232,7 +232,7 @@ package body TranscriptPkg is
   end procedure XmlClose ; 
 
   ------------------------------------------------------------
-  impure function  TranscriptOpen (ExternalName: STRING; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) return FILE_OPEN_STATUS is
+  impure function  TranscriptOpen (ExternalName: STRING := "../log/osvvm_transcript.txt"; OpenKind: WRITE_APPEND_OPEN_KIND := WRITE_MODE) return FILE_OPEN_STATUS is
   ------------------------------------------------------------
     variable Status : FILE_OPEN_STATUS ; 
   begin
