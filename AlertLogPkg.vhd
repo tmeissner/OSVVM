@@ -681,8 +681,13 @@ package body AlertLogPkg is
 
 
     procedure IncAffirmPassCount(AlertLogID : AlertLogIDType) is
+      variable StopDueToCount : boolean := false;
     begin
       AlertLogPtr(AlertLogID).AlertCount(PASSING) := AlertLogPtr(AlertLogID).AlertCount(PASSING) + 1 ;
+      -- Propagate counts to parent(s)  -- Ascend Hierarchy
+      if AlertLogID /= ALERTLOG_BASE_ID then
+        IncrementAlertCount(AlertLogPtr(AlertLogID).ParentID, PASSING, StopDueToCount) ; 
+      end if ; 
     end procedure IncAffirmPassCount;
 
 
