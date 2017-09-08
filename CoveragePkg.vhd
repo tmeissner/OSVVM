@@ -1474,7 +1474,7 @@ package body CoveragePkg is
           write(buf, Prefix & S & CovNameVar.Get) ;
         elsif AlertLogIDVar /= OSVVM_ALERTLOG_ID then
           -- otherwise Print AlertLogName if it is set
-          write(buf, Prefix & S & GetAlertLogName(AlertLogIDVar)) ;
+          write(buf, Prefix & S & string'(GetAlertLogName(AlertLogIDVar))) ;
         else 
           -- otherwise print the first line of the message
           MessageIndex := 2 ; 
